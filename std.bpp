@@ -1,0 +1,3 @@
+def print (console.log)
+def qs (document.querySelector)
+def pi (3.141592653589)
