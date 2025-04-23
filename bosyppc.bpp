@@ -148,6 +148,7 @@ fn compiler_ast(ast) {
     if (ast && ast.ast) ast = ast.ast;
     for (let i = 0; i < ast.length; ++i) {
         let obj = compiler_ast(ast[i]);
+        print(obj);
         if (obj.type === "word") {
             match (obj.value) {
                 "include" {
@@ -206,7 +207,7 @@ fn compiler_ast(ast) {
                     }
                     else {
                         modules[cmodule].push(ast[i + 1].value);
-                        code += ast[i + 1].value + ": function";
+                        code += ast[i + 1].value + ": function ";
                         i++;
                     }
                     continue;
@@ -254,6 +255,7 @@ fn compiler_ast(ast) {
                     cmodule = name;
                     modules[cmodule] = [];
                     code += "const " + name + " = " + compiler_ast(ast[i]).value + ";";
+                    print(modules[cmodule]);
                     cmodule = undefined;
                     continue;
                 }
@@ -344,10 +346,10 @@ fn compiler_ast(ast) {
             continue;
         }
         for (let j = 0; j < usings.length; ++j) {
-            if (modules[usings[i]]) {
-                print(modules[usings[i]], "'"+obj.value+"'", modules[usings[i]].indexOf(obj.value) !== -1);
-                if (modules[usings[i]].indexOf(obj.value) !== -1) {
-                    code += usings[i] + ".";
+            if (modules[usings[j]]) {
+                print(modules[usings[j]], "'"+obj.value+"'", modules[usings[j]].indexOf(obj.value) !== -1);
+                if (modules[usings[j]].indexOf(obj.value) !== -1) {
+                    code += usings[j] + ".";
                     break;
                 }
             }

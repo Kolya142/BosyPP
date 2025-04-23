@@ -1,0 +1,11 @@
+def res (64)
+fn main() {
+    const buffer = Array(res * res);
+    for (let i = 0; i < res; ++i) {
+        for (let j = 0; j < res; ++j) {
+            buffer[i+(res-j)*res] = (0 === (j & i)) ? '#' : ' ';
+        }
+    }
+    console.log(buffer.join(''));
+}
+main();

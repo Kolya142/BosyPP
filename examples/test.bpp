@@ -1,3 +1,5 @@
+def print (console.log)
+
 module Graphics {
     enum Color {
         RED
@@ -6,17 +8,20 @@ module Graphics {
         BLACK
         GRAY
     }
+    fn PrintColor(col) {
+        print(Graphics.Color[col]);
+    }
 }
 
-def print (console.log)
-print(print);
+using Graphics
 
-using Graphics;
-match (Graphics.Color.RED) {
+PrintColor(Color.BLUE);
+
+match (Color.RED) {
     (Color.RED) {
         print("RED is RED");
     }
-    (Graphics.Color.GREEN) {
+    (Color.GREEN) {
         print("RED is GREEN");
     }
 }
@@ -26,3 +31,5 @@ struct Vec2 {
     y
 }
 
+const my_vec = Vec2(5, 3);
+print(my_vec)
