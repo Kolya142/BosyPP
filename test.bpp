@@ -1,19 +1,22 @@
-enum Color {
-    RED
-    GREEN
-    BLUE
-    BLACK
-    GRAY
+module Graphics {
+    enum Color {
+        RED
+        GREEN
+        BLUE
+        BLACK
+        GRAY
+    }
 }
 
 def print (console.log)
 print(print);
 
-match (Color.RED) {
+using Graphics;
+match (Graphics.Color.RED) {
     (Color.RED) {
         print("RED is RED");
     }
-    (Color.GREEN) {
+    (Graphics.Color.GREEN) {
         print("RED is GREEN");
     }
 }

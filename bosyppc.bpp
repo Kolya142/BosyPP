@@ -84,6 +84,9 @@ fn lexer(code) {
 }
 
 let macros = {};
+let modules = {};
+let cmodule = undefined;
+let usings = [];
 
 fn parser(toks, state = 0) {
     let ast = [];
@@ -165,6 +168,10 @@ fn compiler_ast(ast) {
                     code += "class ";
                     continue;
                 }
+                "extends" {
+                    code += "extends ";
+                    continue;
+                }
                 "let" {
                     code += "let ";
                     continue;
@@ -194,7 +201,19 @@ fn compiler_ast(ast) {
                     continue;
                 }
                 "fn" {
-                    code += "function ";
+                    if (cmodule === undefined) {
+                        code += "function ";
+                    }
+                    else {
+                        modules[cmodule].push(ast[i + 1].value);
+                        code += ast[i + 1].value + ": function";
+                        i++;
+                    }
+                    continue;
+                }
+                "using" {
+                    usings.push(ast[i + 1].value);
+                    i++;
                     continue;
                 }
                 "elif" {
@@ -228,21 +247,46 @@ fn compiler_ast(ast) {
                     }
                     continue;
                 }
+                "module" {
+                    i++;
+                    const name = compiler_ast(ast[i]).value;
+                    i++;
+                    cmodule = name;
+                    modules[cmodule] = [];
+                    code += "const " + name + " = " + compiler_ast(ast[i]).value + ";";
+                    cmodule = undefined;
+                    continue;
+                }
                 "enum" {
                     i++;
                     print(ast[i]);
                     const name = compiler_ast(ast[i]).value;
                     i++;
-                    code += "// Enum (" + name + ")\n";
-                    code += "const " + name + " = {";
-                    for (let j = 0; j < ast[i].value.length; ++j) {
-                        const f = compiler_ast(ast[i].value[j]);
-                        if (f.type == "word") {
-                            code += f.value + ": " + j + ",";
-                            code += j + ": \"" + f.value + "\",";
+                    if (cmodule === undefined) {
+                        code += "// Enum (" + name + ")\n";
+                        code += "const " + name + " = {";
+                        for (let j = 0; j < ast[i].value.length; ++j) {
+                            const f = compiler_ast(ast[i].value[j]);
+                            if (f.type == "word") {
+                                code += f.value + ": " + j + ",";
+                                code += j + ": \"" + f.value + "\",";
+                            }
                         }
+                        code += "};";
                     }
-                    code += "};";
+                    else {
+                        modules[cmodule].push(name);
+                        code += "// Enum (" + name + ")\n";
+                        code += name + ": {";
+                        for (let j = 0; j < ast[i].value.length; ++j) {
+                            const f = compiler_ast(ast[i].value[j]);
+                            if (f.type == "word") {
+                                code += f.value + ": " + j + ",";
+                                code += j + ": \"" + f.value + "\",";
+                            }
+                        }
+                        code += "},";
+                    }
                     continue;
                 }
                 "struct" {
@@ -253,7 +297,13 @@ fn compiler_ast(ast) {
                     for (let j = 0; j < ast[i].value.length; ++j) {
                         fields.push(compiler_ast(ast[i].value[j]).value);
                     }
-                    code += "function " + name + "(";
+                    if (cmodule === undefined) {
+                        code += "function " + name + "(";
+                    }
+                    else {
+                        modules[cmodule].push(name);
+                        code += name + ": function (";
+                    }
                     for (let j = 0; j < fields.length; ++j) {
                         code += "_" + fields[j];
                         if (j != fields.length - 1) {
@@ -292,6 +342,15 @@ fn compiler_ast(ast) {
         elif (obj.type === "string") {
             code += obj.value;
             continue;
+        }
+        for (let j = 0; j < usings.length; ++j) {
+            if (modules[usings[i]]) {
+                print(modules[usings[i]], "'"+obj.value+"'", modules[usings[i]].indexOf(obj.value) !== -1);
+                if (modules[usings[i]].indexOf(obj.value) !== -1) {
+                    code += usings[i] + ".";
+                    break;
+                }
+            }
         }
         code += obj.value;
     }
