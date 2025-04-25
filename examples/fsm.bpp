@@ -1,0 +1,26 @@
+enum States {
+    RED
+    YELLOW
+    GREEN
+}
+fn update(prev, ev) {
+    match (prev) {
+        (States.RED) {
+            return States.YELLOW;
+        }
+        (States.YELLOW) {
+            return States.GREEN;
+        }
+        (States.GREEN) {
+            return States.RED;
+        }
+    }
+}
+
+let fsm = States.RED;
+console.log(States[fsm]);
+fsm = update(fsm);
+console.log(States[fsm]);
+fsm = update(fsm);
+console.log(States[fsm]);
+fsm = update(fsm);
