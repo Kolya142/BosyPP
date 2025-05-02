@@ -1,5 +1,5 @@
+"use strict";
 def print (console.log)
-
 fn lexer(code) {
     const tokens = [];
     let pos = 0;
@@ -9,10 +9,10 @@ fn lexer(code) {
             pos++;
             continue;
         }
-        if (/[0-9]/.test(char) || (char === '-' && /[0-9]/.test(code[pos + 1]))) {
+        if (/[0-9]/.test(char) || (char == '-' && /[0-9]/.test(code[pos + 1]))) {
             let start = pos;
             pos++;
-            while (/[0-9]/.test(code[pos]) || code[pos] === 'x' || code[pos] === 'b') {
+            while (/[0-9]/.test(code[pos]) || code[pos] == 'x' || code[pos] == 'b' || code[pos] == '.') {
                 pos++;
             }
             tokens.push(code.slice(start, pos));
@@ -37,8 +37,8 @@ fn lexer(code) {
         if (char == "\"" || char == "'") {
             pos++;
             let value = "";
-            while (pos < code.length && code[pos] !== char) {
-                if (code[pos] === '\\') {
+            while (pos < code.length && code[pos] != char) {
+                if (code[pos] == '\\') {
                     pos++;
                     switch (code[pos]) {
                         case "\"": value += "\\\""; break;
@@ -62,7 +62,7 @@ fn lexer(code) {
         }
         if ("!@#$%^&*()-+=_{}[]|:;<>,.?/\\".indexOf(char) != -1) {
             let value = char;
-            if ((char === '!' || char === '=' || char === '<' || char === '>' || char === '+' || char === '-' || char === '*' || char === '/') && code[pos + 1] === '=') {
+            if ((char == '!' || char == '=' || char == '<' || char == '>' || char == '+' || char == '-' || char == '*' || char == '/') && code[pos + 1] == '=') {
                 value += code[++pos];
             }
             pos++;
@@ -86,33 +86,33 @@ fn lexer(code) {
 let macros = {};
 let modules = {};
 let cmodule = undefined;
+let types = {};
 let usings = [];
 
-// def DEBUG ()
 
 fn parser(toks, state = 0) {
     let ast = [];
     while (toks.length) {
         const tok = toks[0];
         toks = toks.slice(1);
-        if (/[0-9]/.test(tok[0]) || tok[0] === '-' && /[0-9]/.test(tok[1])) {
+        if (/[0-9]/.test(tok[0]) || tok[0] == '-' && /[0-9]/.test(tok[1])) {
             ast.push({"type": "number", "value": Number(tok)});
         }
-        elif (tok[0] === "\"" || tok[0] === "'") {
+        elif (tok[0] == "\"" || tok[0] == "'") {
             ast.push({"type": "string", "value": tok.substr(1, tok.length - 2)});
         }
-        elif (state === 1 && tok === ")") {
+        elif (state == 1 && tok == ")") {
             break;
         }
-        elif (state === 2 && tok === "}") {
+        elif (state == 2 && tok == "}") {
             break;
         }
-        elif (tok === "(") {
+        elif (tok == "(") {
             const inner = parser(toks, 1);
             toks = inner.tokens;
             ast.push({"type": "expr", "value": inner.ast});
         }
-        elif (tok === "{") {
+        elif (tok == "{") {
             const inner = parser(toks, 2);
             toks = inner.tokens;
             ast.push({"type": "block", "value": inner.ast});
@@ -123,7 +123,6 @@ fn parser(toks, state = 0) {
     }
     return {"ast": ast, "tokens": toks};
 }
-
 fn compiler_ast(ast) {
     let code = "";
     let currt = null;
@@ -151,20 +150,16 @@ fn compiler_ast(ast) {
     for (let i = 0; i < ast.length; ++i) {
         let obj = compiler_ast(ast[i]);
         ifdef DEBUG {print(obj);}
-        if (obj.type === "word") {
+        if (obj.type == "word") {
             match (obj.value) {
                 "include" {
                     obj = ast[i + 1];
-                    if (obj.type !== "string") {
+                    if (obj.type != "string") {
                         print("Excepted <include \"\"> but got <include " + obj.value + ">");
                         exit(1);
                     }
                     code += "\n" + compiler_ast(parser(lexer(fs.readFileSync(obj.value, 'utf8')))) + "\n";
                     i++;
-                    continue;
-                }
-                "const" {
-                    code += "const ";
                     continue;
                 }
                 "class" {
@@ -175,8 +170,19 @@ fn compiler_ast(ast) {
                     code += "extends ";
                     continue;
                 }
+                "const" {
+                    code += "const ";
+                    continue;
+                }
                 "let" {
-                    code += "let ";
+                    if (cmodule == undefined) {
+                        code += "let ";
+                    }
+                    else {
+                        modules[cmodule].push(ast[i + 1].value);
+                        code += ast[i + 1].value + ": ";
+                        i += 2;
+                    }
                     continue;
                 }
                 "var" {
@@ -192,7 +198,7 @@ fn compiler_ast(ast) {
                     continue;
                 }
                 "fn" {
-                    if (cmodule === undefined) {
+                    if (cmodule == undefined) {
                         code += "function ";
                     }
                     else {
@@ -212,14 +218,14 @@ fn compiler_ast(ast) {
                     continue;
                 }
                 "ifdef" {
-                    if (macros[ast[i + 1].value] !== undefined) {
+                    if (macros[ast[i + 1].value] != undefined) {
                         code += compiler_ast(ast[i + 2]).value;
                     }
                     i += 2;
                     continue
                 }
                 "ifndef" {
-                    if (macros[ast[i + 1].value] === undefined) {
+                    if (macros[ast[i + 1].value] == undefined) {
                         code += compiler_ast(ast[i + 2]).value;
                     }
                     i += 2;
@@ -256,7 +262,7 @@ fn compiler_ast(ast) {
                     i++;
                     const name = compiler_ast(ast[i]).value;
                     i++;
-                    if (cmodule === undefined) {
+                    if (cmodule == undefined) {
                         code += "// Enum (" + name + ")\n";
                         code += "const " + name + " = {";
                         for (let j = 0; j < ast[i].value.length; ++j) {
@@ -291,7 +297,7 @@ fn compiler_ast(ast) {
                     for (let j = 0; j < ast[i].value.length; ++j) {
                         fields.push(compiler_ast(ast[i].value[j]).value);
                     }
-                    if (cmodule === undefined) {
+                    if (cmodule == undefined) {
                         code += "function " + name + "(";
                     }
                     else {
@@ -339,19 +345,29 @@ fn compiler_ast(ast) {
                     i++;
                     continue;
                 }
-            }
-            if (macros[obj.value] !== undefined) {
-                code += compiler_ast(macros[obj.value]);
-                continue;
+		"==" {
+		     code += "===";
+		     continue;
+		}
+		"!=" {
+		     code += "!==";
+		     continue;
+		}
+		_ {
+		    if (macros[obj.value] != undefined) {
+		        code += compiler_ast(macros[obj.value]);
+		        continue;
+		    }
+		}
             }
         }
-        elif (obj.type === "string") {
+        elif (obj.type == "string") {
             code += obj.value;
             continue;
         }
         for (let j = 0; j < usings.length; ++j) {
             if (modules[usings[j]]) {
-                if (modules[usings[j]].indexOf(obj.value) !== -1) {
+                if (modules[usings[j]].indexOf(obj.value) != -1) {
                     code += usings[j] + ".";
                     break;
                 }

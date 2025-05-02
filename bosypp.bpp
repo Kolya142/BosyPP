@@ -2,7 +2,7 @@ const argv = process.argv;
 const bpp = argv[2];
 const fs = require('node:fs');
 let code = fs.readFileSync(bpp, 'utf8');
-
+// def DEBUG ()
 include "bosyppc.bpp"
 
 const ast = parser(lexer(code));
