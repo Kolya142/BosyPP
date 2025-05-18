@@ -1,0 +1,82 @@
+fn lexer(code) {
+    const tokens = [];
+    let pos = 0;
+    while (pos < code.length) {
+        let char = code[pos];
+        if (/\s/.test(char)) {
+            pos++;
+            continue;
+        }
+        if (/[0-9]/.test(char) || (char == '-' && /[0-9]/.test(code[pos + 1]))) {
+            let start = pos;
+            pos++;
+            while (/[0-9]/.test(code[pos]) || code[pos] == 'x' || code[pos] == 'b' || code[pos] == '.') {
+                pos++;
+            }
+            tokens.push(code.slice(start, pos));
+            continue;
+        }
+        if (char == "/" && code[pos + 1] == "/") { // Test
+            pos += 2;
+            while (code[pos] != "\n") {
+                pos++;
+            }
+            pos++;
+            continue;
+        }
+        if (char == "/" && code[pos + 1] == "*") { /* Test */
+            pos += 2;
+            while (code[pos] != "*" || code[pos + 1] != "/") {
+                pos++;
+            }
+            pos += 2;
+            continue;
+        }
+        if (char == "\"" || char == "'") {
+            pos++;
+            let value = "";
+            while (pos < code.length && code[pos] != char) {
+                if (code[pos] == '\\') {
+                    pos++;
+                    switch (code[pos]) {
+                        case "\"": value += "\\\""; break;
+                        case "'": value += "\\'"; break;
+                        case 'n': value += '\\n'; break;
+                        case 't': value += '\\t'; break;
+                        case 'r': value += '\\r'; break;
+                        case '\\': value += '\\\\'; break;
+                        default: value += '\\'; value += code[pos]; break;
+                    }
+                    pos++;
+                }
+                else {
+                    value += code[pos];
+                    pos++;
+                }
+            }
+            pos++;
+            tokens.push(char + value + char);
+            continue;
+        }
+        if ("!@#$%^&*()-+=_{}[]|:;<>,.?/\\".indexOf(char) != -1) {
+            let value = char;
+            if ((char == '!' || char == '=' || char == '<' || char == '>' || char == '+' || char == '-' || char == '*' || char == '/') && code[pos + 1] == '=') {
+                value += code[++pos];
+            }
+            pos++;
+            tokens.push(value);
+            continue;
+        }
+        if (/[a-zA-Z_]/.test(char)) {
+            let start = pos;
+            while (/[a-zA-Z0-9_]/.test(code[pos])) {
+                pos++;
+            }
+            tokens.push(code.slice(start, pos));
+            continue;
+        }
+        tokens.push(char);
+        pos++;
+    }
+    return tokens;
+}
