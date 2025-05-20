@@ -1,10 +1,11 @@
-def res (64)
+def res (50)
 fn main() {
-    const buffer = Array(res * res);
+    const buffer = Array(res * res + res);
     for (let i = 0; i < res; ++i) {
         for (let j = 0; j < res; ++j) {
-            buffer[i+(res-j)*res] = (0 === (j & i)) ? '#' : ' ';
+            buffer[i+(res-1-j)*(res+1)] = (0 == (j & i)) ? '#' : ' ';
         }
+	buffer[i*(res+1)+res] = '\n';
     }
     console.log(buffer.join(''));
 }

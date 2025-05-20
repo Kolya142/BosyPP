@@ -6,4 +6,4 @@ let code = fs.readFileSync(bpp, 'utf8');
 include "bosyppc.bpp"
 
 const ast = parser(lexer(code));
-fs.writeFileSync(bpp+'.js', compiler_ast(ast));
+fs.writeFileSync(bpp+'.js', compiler_ast(ast, SourceMap([], [], ContextFunction("function", "toplevel", null, null), null, null, [])).value);

@@ -7,16 +7,64 @@ include "parser.bpp"
 let macros = {};
 let types = {};
 
-fn compiler_ast(ast) {
-    let code = "";
-    let currt = null;
+struct Context {
+    type name
+}
+
+struct ContextFunction {
+    type name args ret
+}
+
+struct ContextStmt {
+    type name
+}
+
+struct ContextMatch {
+    type name testable
+}
+
+struct SourceMap {
+    variables functions context return_type parent interfaces
+}
+
+struct Variable {
+    name type pvalue
+}
+
+struct EaterResult {
+    i code sm
+}
+
+fn eat_variable_define(ast, i, sm) > EaterResult {
+    code = ast[i].value + " ";
+    i++;
+    if (ast[i].value == ":") {
+        sm.variables.push(Variable(ast[i-1].value, ast[i + 1].value, null));
+        i += 2;
+    }
+    if (ast[i].value != "=") {
+        throw "Excepted = at variable definition";
+    }
+    i++;
+    code += " = ";
+    while (ast[i].value != ";") {
+        code += compiler_ast(ast[i], sm).value;
+        i++;
+    }
+    code += ";\n";
+    return EaterResult(i, code, sm);
+}
+
+fn compiler_ast(ast, sm) {
+    print(sm);
+    let code: string = "";
     if (ast.type) {
         match (ast.type) {
             "expr" {
-                return {type:"expr", value:"(" + compiler_ast(ast.value) + ")"};
+                return {type:"expr", value:"(" + compiler_ast(ast.value, sm).value + ")"};
             }
             "block" {
-                return {type:"block", value:"{" + compiler_ast(ast.value) + "}"};
+                return {type:"block", value:"{" + compiler_ast(ast.value, sm).value + "}"};
             }
             "string" {
                 return {type:"string", value:"\""+ast.value+"\""};
@@ -28,11 +76,11 @@ fn compiler_ast(ast) {
                 return {type:"word", value:ast.value};
             }
         }
-        return undefined;
+        throw "Unknown ast type ("+ast.type+")";
     }
     if (ast && ast.ast) ast = ast.ast;
     for (let i = 0; i < ast.length; ++i) {
-        let obj = compiler_ast(ast[i]);
+        let obj = compiler_ast(ast[i], sm);
         ifdef DEBUG {print(obj);}
         if (obj.type == "word") {
             match (obj.value) {
@@ -42,7 +90,8 @@ fn compiler_ast(ast) {
                         print("Excepted <include \"\"> but got <include " + obj.value + ">");
                         exit(1);
                     }
-                    code += "\n" + compiler_ast(parser(lexer(fs.readFileSync(obj.value, 'utf8')))) + "\n";
+		    const d = compiler_ast(parser(lexer(fs.readFileSync(obj.value, 'utf8'))), sm);
+                    code += "\n" + d.value + "\n";
                     i++;
                     continue;
                 }
@@ -56,15 +105,34 @@ fn compiler_ast(ast) {
                 }
                 "const" {
                     code += "const ";
+		    i++;
+		    const er = eat_variable_define(ast, i, sm);
+		    i = er.i;
+		    code += er.code;
+		    sm = er.sm;
                     continue;
                 }
                 "let" {
                     code += "let ";
+		    i++;
+		    const er = eat_variable_define(ast, i, sm);
+		    i = er.i;
+		    code += er.code;
+		    sm = er.sm;
                     continue;
                 }
                 "var" {
                     code += "let ";
+		    i++;
+		    const er = eat_variable_define(ast, i, sm);
+		    i = er.i;
+		    code += er.code;
+		    sm = er.sm;
                     continue;
+                }
+		"new" {
+		    code += "new ";
+		    continue;
                 }
                 "case" {
                     code += "case ";
@@ -76,6 +144,15 @@ fn compiler_ast(ast) {
                 }
                 "fn" {
                     code += "function ";
+		    code += ast[i + 1].value;
+		    const csm = SourceMap(sm.variables, sm.functions, ContextFunction("function", ast[i + 1].value, null, null), sm.interfaces);
+		    code += compiler_ast(ast[i + 2], csm).value + " ";
+		    if (ast[i + 3].value == ">") {
+		        csm.context.return_type = ast[i + 4].value;
+			i += 2;
+		    }
+		    code += compiler_ast(ast[i + 3], csm).value;
+		    i += 3;
                     continue;
                 }
                 "elif" {
@@ -88,27 +165,28 @@ fn compiler_ast(ast) {
 		}
                 "ifdef" {
                     if (macros[ast[i + 1].value] != undefined) {
-                        code += compiler_ast(ast[i + 2]).value;
+                        code += compiler_ast(ast[i + 2], sm).value;
                     }
                     i += 2;
                     continue
                 }
                 "ifndef" {
                     if (macros[ast[i + 1].value] == undefined) {
-                        code += compiler_ast(ast[i + 2]).value;
+                        code += compiler_ast(ast[i + 2], sm).value;
                     }
                     i += 2;
                     continue
                 }
                 "match" {
                     i++;
-                    const value = compiler_ast(ast[i]).value;
+                    const value = compiler_ast(ast[i], sm).value;
+		    const csm = SourceMap(sm.variables, sm.functions, ContextMatch("match", null, value), null, sm.interfaces);
                     i++;
                     for (let j = 0; j < ast[i].value.length; j += 2) {
-                        const f = compiler_ast(ast[i].value[j]).value;
+                        const f = compiler_ast(ast[i].value[j], csm).value;
                         const d = ast[i].value[j+1];
                         if (f == "_") {
-                            code += "else {" + compiler_ast(d).value + "}";
+                            code += "else {" + compiler_ast(d, csm).value + "}";
                         }
                         else {
 			    if (!j) {
@@ -117,19 +195,25 @@ fn compiler_ast(ast) {
 			    else {
 			        code += "else if ";
 			    }
-                            code += "((" + value + ") === " + f + ") {" + compiler_ast(d).value + "}";
+			    if (f == "if") {
+			        code += "(" + compiler_ast(d, csm).value + ") " + compiler_ast(ast[i].value[j+2], csm).value + "";
+			        j++;
+			    }
+			    else {
+                                code += "((" + value + ") === " + f + ") {" + compiler_ast(d, csm).value + "}";
+			    }
                         }
                     }
                     continue;
-                }
+		}
                 "enum" {
                     i++;
-                    const name = compiler_ast(ast[i]).value;
+                    const name = compiler_ast(ast[i], sm).value;
                     i++;
                     code += "// Enum (" + name + ")\n";
                     code += "const " + name + " = {";
                     for (let j = 0; j < ast[i].value.length; ++j) {
-                        const f = compiler_ast(ast[i].value[j]);
+                        const f = compiler_ast(ast[i].value[j], sm);
                         if (f.type == "word") {
                             code += f.value + ": " + j + ",";
                             code += j + ": \"" + f.value + "\",";
@@ -140,11 +224,11 @@ fn compiler_ast(ast) {
                 }
                 "struct" {
                     i++;
-                    const name = compiler_ast(ast[i]).value;
+                    const name = compiler_ast(ast[i], sm).value;
                     i++;
                     let fields = [];
                     for (let j = 0; j < ast[i].value.length; ++j) {
-                        fields.push(compiler_ast(ast[i].value[j]).value);
+                        fields.push(compiler_ast(ast[i].value[j], sm).value);
                     }
                     code += "function " + name + "(";
                     for (let j = 0; j < fields.length; ++j) {
@@ -176,14 +260,14 @@ fn compiler_ast(ast) {
                     continue;
                 }
                 "def" {
-                    const name = compiler_ast(ast[i + 1]).value;
+                    const name = compiler_ast(ast[i + 1], sm).value;
                     const expands = ast[i + 2].value;
                     macros[name] = expands;
                     i += 2;
                     continue;
                 }
                 "undef" {
-                    const name = compiler_ast(ast[i + 1]).value;
+                    const name = compiler_ast(ast[i + 1], sm).value;
                     macros[name] = undefined;
                     i++;
                     continue;
@@ -196,13 +280,15 @@ fn compiler_ast(ast) {
 		     code += "!==";
 		     continue;
 		}
-		_ {
-		    if (macros[obj.value] != undefined) {
-		        code += compiler_ast(macros[obj.value]);
-		        continue;
-		    }
+		if (macros[obj.value] != undefined) {
+                    code += compiler_ast(macros[obj.value], sm).value;
+                    continue;
 		}
-            }
+		if (obj.type == "number") {
+		    code += obj.value;
+		    continue;
+		}
+	    }
         }
         elif (obj.type == "string") {
             code += obj.value;
@@ -210,5 +296,5 @@ fn compiler_ast(ast) {
         }
         code += obj.value;
     }
-    return code;
+    return {type: "code", value: code};
 }
